@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 import pandas as pd
 from game_features import show_analytics, reset_game, show_help, show_navigation
+from shared_state import load_players, add_or_update_player
 
 # Set page config
 st.set_page_config(
@@ -16,7 +17,8 @@ st.set_page_config(
 
 # Initialize session state
 if 'players' not in st.session_state:
-    st.session_state.players = {}
+    # Load shared players from disk so multiple browser sessions can see each other
+    st.session_state.players = load_players()
 if 'current_player' not in st.session_state:
     st.session_state.current_player = None
 if 'game_mode' not in st.session_state:
@@ -374,12 +376,15 @@ def main():
         player_name = st.text_input("Enter your name:")
         if st.button("Join Game") and player_name:
             if player_name not in st.session_state.players:
-                st.session_state.players[player_name] = {
+                info = {
                     "score": 0,
                     "questions_answered": 0,
                     "correct_answers": 0,
                     "join_time": datetime.now().strftime("%H:%M:%S")
                 }
+                # Persist to shared storage
+                add_or_update_player(player_name, info)
+                st.session_state.players[player_name] = info
                 st.success(f"Welcome {player_name}!")
             else:
                 st.info(f"Welcome back {player_name}!")
@@ -515,6 +520,8 @@ def quick_challenge_mode(player_name, topic=None):
 
                     st.info(f"⏱️ Time taken: {time_taken:.1f} seconds")
                     st.session_state.answer_submitted = True
+                    # Persist updated player to shared storage so other sessions see it
+                    add_or_update_player(player_name, st.session_state.players[player_name])
 
     # Show current stats
     player_stats = st.session_state.players[player_name]
@@ -585,6 +592,8 @@ def speed_round_mode(player_name):
             # Add to player's total score
             st.session_state.players[player_name]['score'] += final_score
             st.session_state.players[player_name]['questions_answered'] += questions_answered
+            # Persist updates
+            add_or_update_player(player_name, st.session_state.players[player_name])
 
             if st.button("Play Again"):
                 st.rerun()

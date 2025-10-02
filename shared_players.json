@@ -1,0 +1,14 @@
+{
+  "Alice": {
+    "score": 5,
+    "questions_answered": 1,
+    "correct_answers": 1,
+    "join_time": "12:00:00"
+  },
+  "Bob": {
+    "score": 8,
+    "questions_answered": 2,
+    "correct_answers": 2,
+    "join_time": "12:01:00"
+  }
+}
