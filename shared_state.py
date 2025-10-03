@@ -1,10 +1,11 @@
-import os
 import json
+import os
 from threading import Lock
 
 # Simple file-backed shared players storage. Atomic writes via temp+rename.
 _lock = Lock()
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'shared_players.json')
+
 
 def load_players():
     """Load players dict from disk. Returns empty dict if file missing or invalid."""
@@ -20,6 +21,7 @@ def load_players():
         return {}
     return {}
 
+
 def save_players(players: dict):
     """Save players dict to disk atomically."""
     tmp = STATE_FILE + '.tmp'
@@ -32,8 +34,10 @@ def save_players(players: dict):
             # fallback
             os.remove(tmp) if os.path.exists(tmp) else None
 
+
 def reset_players():
     save_players({})
+
 
 def add_or_update_player(player_name: str, info: dict):
     players = load_players()

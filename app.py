@@ -1,10 +1,11 @@
-import streamlit as st
 import random
 import time
-import json
 from datetime import datetime
-import pandas as pd
-from game_features import show_analytics, reset_game, show_help, show_navigation
+
+import streamlit as st
+
+from game_features import show_navigation, show_analytics, show_help, reset_game
+from shared_state import load_players, add_or_update_player
 
 # Set page config
 st.set_page_config(
@@ -16,7 +17,8 @@ st.set_page_config(
 
 # Initialize session state
 if 'players' not in st.session_state:
-    st.session_state.players = {}
+    # Load shared players from disk so multiple browser sessions can see each other
+    st.session_state.players = load_players()
 if 'current_player' not in st.session_state:
     st.session_state.current_player = None
 if 'game_mode' not in st.session_state:
@@ -25,6 +27,7 @@ if 'question_data' not in st.session_state:
     st.session_state.question_data = {}
 if 'leaderboard' not in st.session_state:
     st.session_state.leaderboard = []
+
 
 class MathGame:
     def __init__(self):
@@ -44,8 +47,8 @@ class MathGame:
         if operation in ['+', '-']:
             # Same denominator for easier computation
             denom = random.choice([2, 3, 4, 5, 6, 8, 10, 12])
-            num1 = random.randint(1, denom-1)
-            num2 = random.randint(1, denom-1)
+            num1 = random.randint(1, denom - 1)
+            num2 = random.randint(1, denom - 1)
 
             if operation == '+':
                 result = (num1 + num2) / denom
@@ -142,7 +145,7 @@ class MathGame:
         # Simplify the ratio
         from math import gcd
         common = gcd(num1, num2)
-        simplified_ratio = f"{num1//common}:{num2//common}"
+        simplified_ratio = f"{num1 // common}:{num2 // common}"
 
         question = scenario.format(num1, num2)
 
@@ -270,9 +273,9 @@ class MathGame:
             sorted_data = sorted(data)
             n = len(sorted_data)
             if n % 2 == 0:
-                correct = (sorted_data[n//2-1] + sorted_data[n//2]) / 2
+                correct = (sorted_data[n // 2 - 1] + sorted_data[n // 2]) / 2
             else:
-                correct = sorted_data[n//2]
+                correct = sorted_data[n // 2]
             question = f"What is the median of this dataset: {data}?"
         elif question_type == "mode":
             # Ensure there's a clear mode
@@ -359,8 +362,10 @@ class MathGame:
             topic = random.choice(list(self.topics.keys()))
             return self.topics[topic]()
 
+
 # Initialize the game
 game = MathGame()
+
 
 def main():
     st.title("🎯 NJSLA Math Challenge")
@@ -374,12 +379,15 @@ def main():
         player_name = st.text_input("Enter your name:")
         if st.button("Join Game") and player_name:
             if player_name not in st.session_state.players:
-                st.session_state.players[player_name] = {
+                info = {
                     "score": 0,
                     "questions_answered": 0,
                     "correct_answers": 0,
                     "join_time": datetime.now().strftime("%H:%M:%S")
                 }
+                # Persist to shared storage
+                add_or_update_player(player_name, info)
+                st.session_state.players[player_name] = info
                 st.success(f"Welcome {player_name}!")
             else:
                 st.info(f"Welcome back {player_name}!")
@@ -432,7 +440,7 @@ def main():
             # Show game instructions
             st.markdown("""
             ## 📚 How to Play
-            
+
             1. **Join the Game**: Enter your name in the sidebar
             2. **Choose a Game Mode**:
                - **Quick Challenge**: Random questions from all topics
@@ -442,7 +450,7 @@ def main():
             3. **Answer Questions**: Select the correct answer from multiple choices
             4. **Earn Points**: Get points for correct answers, bonus for speed
             5. **Compete**: Compare your scores with friends on the leaderboard
-            
+
             ## 📖 NJSLA Topics Covered
             - Fractions and Mixed Numbers
             - Decimals and Operations
@@ -451,7 +459,7 @@ def main():
             - Introductory Algebra
             - Statistics (Mean, Median, Mode, Range)
             - Word Problems and Real-world Applications
-            
+
             ## 🚀 Getting Started
             Ready to challenge your friends? Enter your name in the sidebar and let's start practicing for NJSLA!
             """)
@@ -464,6 +472,7 @@ def main():
                 st.info("🏆 **Compete**: Challenge friends and classmates")
             with col3:
                 st.info("📈 **Track**: Monitor your progress and improvement")
+
 
 def quick_challenge_mode(player_name, topic=None):
     st.subheader(f"🚀 Quick Challenge - {player_name}")
@@ -488,8 +497,8 @@ def quick_challenge_mode(player_name, topic=None):
 
             if not st.session_state.answer_submitted:
                 selected_answer = st.radio("Choose your answer:",
-                                         question['options'],
-                                         key=f"answer_{id(question)}")
+                                           question['options'],
+                                           key=f"answer_{id(question)}")
 
                 if st.button("Submit Answer"):
                     end_time = time.time()
@@ -515,6 +524,8 @@ def quick_challenge_mode(player_name, topic=None):
 
                     st.info(f"⏱️ Time taken: {time_taken:.1f} seconds")
                     st.session_state.answer_submitted = True
+                    # Persist updated player to shared storage so other sessions see it
+                    add_or_update_player(player_name, st.session_state.players[player_name])
 
     # Show current stats
     player_stats = st.session_state.players[player_name]
@@ -528,9 +539,11 @@ def quick_challenge_mode(player_name, topic=None):
     with col3:
         st.metric("Accuracy", f"{accuracy:.1f}%")
 
+
 def topic_focus_mode(player_name, topic):
     st.subheader(f"📚 Topic Focus: {topic} - {player_name}")
     quick_challenge_mode(player_name, topic)
+
 
 def speed_round_mode(player_name):
     st.subheader(f"⚡ Speed Round - {player_name}")
@@ -557,8 +570,8 @@ def speed_round_mode(player_name):
             st.markdown(f"**{question['question']}**")
 
             selected_answer = st.radio("Quick! Choose your answer:",
-                                     question['options'],
-                                     key=f"speed_{st.session_state.speed_round_questions}")
+                                       question['options'],
+                                       key=f"speed_{st.session_state.speed_round_questions}")
 
             if st.button("Submit"):
                 selected_index = question['options'].index(selected_answer)
@@ -572,7 +585,8 @@ def speed_round_mode(player_name):
                 st.session_state.question_data = game.get_random_question()
                 st.rerun()
 
-            st.markdown(f"**Current Score: {st.session_state.speed_round_score} | Questions: {st.session_state.speed_round_questions}**")
+            st.markdown(
+                f"**Current Score: {st.session_state.speed_round_score} | Questions: {st.session_state.speed_round_questions}**")
         else:
             # Time's up!
             st.session_state.speed_round_active = False
@@ -585,9 +599,12 @@ def speed_round_mode(player_name):
             # Add to player's total score
             st.session_state.players[player_name]['score'] += final_score
             st.session_state.players[player_name]['questions_answered'] += questions_answered
+            # Persist updates
+            add_or_update_player(player_name, st.session_state.players[player_name])
 
             if st.button("Play Again"):
                 st.rerun()
+
 
 def tournament_mode(player_name):
     st.subheader("🏆 Tournament Mode")
@@ -598,7 +615,7 @@ def tournament_mode(player_name):
 
     # Show leaderboard
     sorted_players = sorted(st.session_state.players.items(),
-                          key=lambda x: x[1]['score'], reverse=True)
+                            key=lambda x: x[1]['score'], reverse=True)
 
     st.markdown("### 🏅 Live Leaderboard")
 
@@ -610,10 +627,11 @@ def tournament_mode(player_name):
         elif i == 2:
             st.markdown(f"🥉 **{name}**: {data['score']} points")
         else:
-            st.markdown(f"{i+1}. **{name}**: {data['score']} points")
+            st.markdown(f"{i + 1}. **{name}**: {data['score']} points")
 
     st.markdown("---")
     quick_challenge_mode(player_name)
+
 
 if __name__ == "__main__":
     main()
