@@ -1,10 +1,10 @@
+import streamlit as st
 import random
 import time
+import json
 from datetime import datetime
-
-import streamlit as st
-
-from game_features import show_navigation, show_analytics, show_help, reset_game
+import pandas as pd
+from game_features import show_analytics, reset_game, show_help, show_navigation
 from shared_state import load_players, add_or_update_player
 
 # Set page config
